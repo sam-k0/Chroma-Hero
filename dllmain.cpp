@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iterator>
 #include "LHCore.h"
+#include "Config.h"
 #define _CRT_SECURE_NO_WARNINGS
 
 CallbackAttributes_t* CodeCallbackAttr;
@@ -18,16 +19,18 @@ YYRValue colorPickerSprite;
 double hue = 0;
 double val = 255;
 double delta = 3;
+const std::string SectionName = "ChromaHero";
+const std::string KeyName = "Color";
 
-void ColorDelta(double& hue, double delta)
+void ColorDelta(double& num, double delta)
 {
     // change hue by delta, wrap around by 0 and 255
-    hue += delta;
-    if (hue > 255)
-        hue = 0;
+    num += delta;
+    if (num > 255)
+        num = 0;
     
-    if (hue < 0)
-        hue = 255;
+    if (num < 0)
+        num = 255;
 }
 
 // Unload function, remove callbacks here
@@ -57,13 +60,54 @@ YYTKStatus ExecuteCodeCallback(YYTKCodeEvent* codeEvent, void*)
     if (Misc::StringHasSubstr(codeObj->i_pName, "o_base_button_Mouse_4"))
     {
         YYRValue objectType = Misc::InstanceGetVariable((double)(selfInst->i_spriteindex), "object_index");
+        std::string cfgFilename = Filesys::GetCurrentDir() + "\\options.ini";
+       
         if ((double)objectType == (double)LHObjectEnum::o_opt_herocolor)
         {
             showColorPicker = !showColorPicker;
-            if (!showColorPicker) // save
+            if (!showColorPicker) // save, hide col picker
             {
+                // Save to file
                 YYRValue col = Misc::CallBuiltinA("make_colour_hsv", { hue, 255.,val });
+
+                if (!WriteIniValue(cfgFilename, SectionName, KeyName, std::to_string((int)((double)col))))
+                {
+                    // err reading
+                    Misc::Print("Error reading color from options.ini (Err. 3)");
+                }
+
                 Misc::CallBuiltinA("variable_global_set", { "opt_hero_color", col });
+            }
+            else //load, show col picker
+            {
+                //Check if it exists
+                Misc::Print("Checking if section exists.");
+                if (KeySectionExists(cfgFilename, SectionName, KeyName))
+                {
+                    std::string cfgOutVal = ReadIniValue(cfgFilename, SectionName, KeyName, "");
+
+                    if (cfgOutVal != "") // actual value
+                    {
+                        YYRValue convertType = std::stod(cfgOutVal);
+                        hue = Misc::CallBuiltinA("colour_get_hue", { convertType });
+                        val = Misc::CallBuiltinA("colour_get_value", { convertType });
+                        Misc::CallBuiltinA("variable_global_set", { "opt_hero_color", convertType });
+                    }
+                    else
+                    {
+                        Misc::Print("Error reading color from options.ini (Err. 2): Read default" + cfgOutVal, CLR_RED);
+                    }
+                    
+                }
+                else // !exists
+                {
+                    Misc::Print("Writing default value");
+                    // Write a default value
+                    YYRValue col = Misc::CallBuiltinA("make_colour_hsv", { 128., 255., 50. });
+                    WriteIniValue(cfgFilename, SectionName, KeyName, std::to_string((int)((double)col)));
+                    Misc::Print("Writing default value done");
+                }
+                
             }
         }
         
