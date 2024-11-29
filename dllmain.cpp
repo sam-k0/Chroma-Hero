@@ -20,7 +20,9 @@ double hue = 0;
 double val = 255;
 double delta = 3;
 const std::string SectionName = "ChromaHero";
-const std::string KeyName = "Color";
+const std::string KeyNameColor = "Color";
+const std::string KeyNameCycle = "Rainbow";
+int enableRainbow = 0;
 
 void ColorDelta(double& num, double delta)
 {
@@ -70,7 +72,7 @@ YYTKStatus ExecuteCodeCallback(YYTKCodeEvent* codeEvent, void*)
                 // Save to file
                 YYRValue col = Misc::CallBuiltinA("make_colour_hsv", { hue, 255.,val });
 
-                if (!WriteIniValue(cfgFilename, SectionName, KeyName, std::to_string((int)((double)col))))
+                if (!WriteIniValue(cfgFilename, SectionName, KeyNameColor, std::to_string((int)((double)col))))
                 {
                     // err reading
                     Misc::Print("Error reading color from options.ini (Err. 3)");
@@ -82,9 +84,9 @@ YYTKStatus ExecuteCodeCallback(YYTKCodeEvent* codeEvent, void*)
             {
                 //Check if it exists
                 Misc::Print("Checking if section exists.");
-                if (KeySectionExists(cfgFilename, SectionName, KeyName))
+                if (KeySectionExists(cfgFilename, SectionName, KeyNameColor))
                 {
-                    std::string cfgOutVal = ReadIniValue(cfgFilename, SectionName, KeyName, "");
+                    std::string cfgOutVal = ReadIniValue(cfgFilename, SectionName, KeyNameColor, "");
 
                     if (cfgOutVal != "") // actual value
                     {
@@ -97,6 +99,10 @@ YYTKStatus ExecuteCodeCallback(YYTKCodeEvent* codeEvent, void*)
                     {
                         Misc::Print("Error reading color from options.ini (Err. 2): Read default" + cfgOutVal, CLR_RED);
                     }
+
+                    // Load boolean as int for rainbow cycle
+					int enableRainbow = ReadIntFromIni(cfgFilename, SectionName,KeyNameCycle, 0);
+					Misc::Print("Rainbow cycle: " + std::to_string(enableRainbow));
                     
                 }
                 else // !exists
@@ -104,7 +110,8 @@ YYTKStatus ExecuteCodeCallback(YYTKCodeEvent* codeEvent, void*)
                     Misc::Print("Writing default value");
                     // Write a default value
                     YYRValue col = Misc::CallBuiltinA("make_colour_hsv", { 128., 255., 50. });
-                    WriteIniValue(cfgFilename, SectionName, KeyName, std::to_string((int)((double)col)));
+                    WriteIniValue(cfgFilename, SectionName, KeyNameColor, std::to_string((int)((double)col)));
+					WriteIniValue(cfgFilename, SectionName, KeyNameCycle, "0");
                     Misc::Print("Writing default value done");
                 }
                 
@@ -176,6 +183,22 @@ DWORD WINAPI KeyControls(HINSTANCE hModule)
     }
 }
 
+DWORD WINAPI CycleColor(HINSTANCE hModule)
+{
+    YYRValue ccolor = Misc::CallBuiltinA("variable_global_get", { "opt_hero_color" });
+    double chue = Misc::CallBuiltinA("colour_get_hue", { ccolor });
+	while (true)
+	{
+		if (enableRainbow)
+		{
+			ColorDelta(chue, 10);
+            YYRValue convertType = Misc::CallBuiltinA("make_colour_hsv", { hue, 255.,255. });
+            Misc::CallBuiltinA("variable_global_set", { "opt_hero_color", convertType });
+            Misc::Print("Cycle..");
+		}
+        Sleep(200);
+	}
+}
 
 // Entry
 DllExport YYTKStatus PluginEntry(
@@ -191,6 +214,7 @@ DllExport YYTKStatus PluginEntry(
 
     CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)LHCore::ResolveCore, &params, 0, NULL); // Check if the Callback Core Module is loaded, and wait for it to load
     CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)KeyControls, NULL, 0, NULL);
+	CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CycleColor, NULL, 0, NULL);
 
     return YYTK_OK; // Successful PluginEntry.
 }
