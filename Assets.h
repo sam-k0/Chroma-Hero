@@ -18,7 +18,7 @@ namespace Assets {
         // Check if the file exists
         if (!Filesys::FileExists(fullpath))
         {
-            PrintMessage(Color::CLR_RED, (("Asset could not be resolved: ") + fullpath).c_str());
+            PrintMessage(Color::CLR_RED, "%s", (("Asset could not be resolved: ") + fullpath).c_str());
             return -1.0;
         }
 
@@ -28,7 +28,7 @@ namespace Assets {
         double res = static_cast<double>(spriteref);
         if (res != -1.0)
         {
-            PrintMessage(Color::CLR_GREEN, (("Loaded asset: ") + fullpath).c_str());
+            PrintMessage(Color::CLR_GREEN, "%s", (("Loaded asset: ") + fullpath).c_str());
         }
         return res; // return the sprite id
     }
@@ -101,13 +101,13 @@ namespace Assets {
         // Check if the file exists
         if (!Filesys::FileExists(fullpath))
         {
-            PrintMessage(Color::CLR_RED, (("Asset could not be resolved: ") + fullpath).c_str());
+            PrintMessage(Color::CLR_RED, "%s", (("Asset could not be resolved: ") + fullpath).c_str());
             return;
         }
 
         YYRValue yyrval;
         CallBuiltin(yyrval, "sprite_replace", nullptr, nullptr, {spriteID, fpath, imgnum, removebg, smooth, xorig, yorig});
-        PrintMessage(Color::CLR_GREEN, (("Replaced asset: ") + fullpath).c_str());
+        PrintMessage(Color::CLR_GREEN, "%s", (("Replaced asset: ") + fullpath).c_str());
     }
 
     // only works on runtime-loaded assets

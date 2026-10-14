@@ -1,31 +1,46 @@
 #include "APIDefs.hpp"
 #include <TlHelp32.h>
 
-HMODULE GetYYTKModule()
+HMODULE FindYYTKModule()
 {
 	HANDLE ModuleSnapshot = INVALID_HANDLE_VALUE;
+
+	// The snapshot fails with ERROR_BAD_LENGTH while another thread is loading or unloading a DLL, so retry until it succeeds
+	do
+	{
+		ModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
+	} while (ModuleSnapshot == INVALID_HANDLE_VALUE && GetLastError() == ERROR_BAD_LENGTH);
+
+	if (ModuleSnapshot == INVALID_HANDLE_VALUE)
+		return nullptr;
 
 	MODULEENTRY32 ModuleEntry;
 	ModuleEntry.dwSize = sizeof(MODULEENTRY32);
 
-	ModuleSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
-	if (ModuleSnapshot == INVALID_HANDLE_VALUE)
-		return nullptr;
-
-	Module32First(ModuleSnapshot, &ModuleEntry);
-
-	do
+	if (Module32First(ModuleSnapshot, &ModuleEntry))
 	{
-		if (GetProcAddress(ModuleEntry.hModule, "GetSDKVersion"))
+		do
 		{
-			CloseHandle(ModuleSnapshot);
-			return ModuleEntry.hModule;
-		}
+			if (GetProcAddress(ModuleEntry.hModule, "GetSDKVersion"))
+			{
+				CloseHandle(ModuleSnapshot);
+				return ModuleEntry.hModule;
+			}
 
-	} while (Module32Next(ModuleSnapshot, &ModuleEntry));
+		} while (Module32Next(ModuleSnapshot, &ModuleEntry));
+	}
 
 	CloseHandle(ModuleSnapshot);
 	return nullptr;
+}
+
+// Every API call goes through here, the module snapshot is way too slow to take per call (e.g. builtins in draw events).
+HMODULE GetYYTKModule()
+{
+	static HMODULE YYTKModule = nullptr;
+	if (!YYTKModule)
+		YYTKModule = FindYYTKModule();
+	return YYTKModule;
 }
 
 bool GetFunctionByName(const std::string& Name, TRoutine& outRoutine)
@@ -113,14 +128,14 @@ void PrintMessage(Color color, const char* fmt, ...)
 	char Buf[MaxStringLength];
 	memset(Buf, 0, MaxStringLength);
 	strncpy(Buf, fmt, MaxStringLength);
-	vsprintf_s(Buf, fmt, vaArgs);
+	_vsnprintf_s(Buf, MaxStringLength, _TRUNCATE, fmt, vaArgs);
 	va_end(vaArgs);
 
 	HMODULE YYTKModule = GetYYTKModule();
 
 	decltype(&PrintMessage) Func = reinterpret_cast<decltype(&PrintMessage)>(GetProcAddress(YYTKModule, __FUNCTION__));
 
-	return Func(color, Buf);
+	return Func(color, "%s", Buf); // The core formats again, Buf may contain '%'.
 }
 
 void PrintError(const char* File, const int& Line, const char* fmt, ...)
@@ -136,14 +151,14 @@ void PrintError(const char* File, const int& Line, const char* fmt, ...)
 	char Buf[MaxStringLength];
 	memset(Buf, 0, MaxStringLength);
 	strncpy(Buf, fmt, MaxStringLength);
-	vsprintf_s(Buf, fmt, vaArgs);
+	_vsnprintf_s(Buf, MaxStringLength, _TRUNCATE, fmt, vaArgs);
 	va_end(vaArgs);
 
 	HMODULE YYTKModule = GetYYTKModule();
 
 	decltype(&PrintError) Func = reinterpret_cast<decltype(&PrintError)>(GetProcAddress(YYTKModule, __FUNCTION__));
 
-	return Func(File, Line, Buf);
+	return Func(File, Line, "%s", Buf);
 }
 
 void PrintMessageNoNewline(Color color, const char* fmt, ...)
@@ -159,14 +174,14 @@ void PrintMessageNoNewline(Color color, const char* fmt, ...)
 	char Buf[MaxStringLength];
 	memset(Buf, 0, MaxStringLength);
 	strncpy(Buf, fmt, MaxStringLength);
-	vsprintf_s(Buf, fmt, vaArgs);
+	_vsnprintf_s(Buf, MaxStringLength, _TRUNCATE, fmt, vaArgs);
 	va_end(vaArgs);
 
 	HMODULE YYTKModule = GetYYTKModule();
 
 	decltype(&PrintMessageNoNewline) Func = reinterpret_cast<decltype(&PrintMessageNoNewline)>(GetProcAddress(YYTKModule, __FUNCTION__));
 
-	return Func(color, Buf);
+	return Func(color, "%s", Buf); // The core formats again, Buf may contain '%'.
 }
 
 YYTKStatus PmGetPluginAttributes(YYTKPlugin* pObject, PluginAttributes_t*& outAttributes)

@@ -28,7 +28,7 @@ DllExport std::string GetPluginName() // For yytk
 namespace Misc {
     void Print(std::string s, Color c = CLR_DEFAULT)
     {
-        PrintMessage(c, (gPluginName + ": " + s).c_str());
+        PrintMessage(c, "%s", (gPluginName + ": " + s).c_str());
     }
 
 
