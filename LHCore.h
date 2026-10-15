@@ -17,6 +17,12 @@ namespace LHCore {
     typedef bool (*UnregisterModule)(std::string);
     UnregisterModule pUnregisterModule = nullptr;
 
+    // Pre patches run before the original event and can return YYTK_DONTCALL to skip it, post patches run after it
+    typedef int (*PrePostPatchCallback)(YYTKCodeEvent*, void*);
+    typedef void (*InstallPatch)(PrePostPatchCallback);
+    InstallPatch pInstallPrePatch = nullptr;
+    InstallPatch pInstallPostPatch = nullptr;
+
     typedef bool (*CoreFoundCallback_t)();
 
     typedef struct ResolveCoreParams_t {
@@ -35,6 +41,8 @@ namespace LHCore {
         void* rawCoreReady;
         void* rawRegisterModule;
         void* rawUnregisterModule;
+        void* rawInstallPrePatch;
+        void* rawInstallPostPatch;
         while (true)
         {
             Sleep(10);
@@ -57,6 +65,11 @@ namespace LHCore {
 #ifdef DEBUG
                         Misc::Print("Registered to Core", CLR_GREEN);
 #endif
+                        if (PmGetExported("API_InstallPrePatch", rawInstallPrePatch) == YYTK_OK)
+                            pInstallPrePatch = reinterpret_cast<InstallPatch>(rawInstallPrePatch);
+                        if (PmGetExported("API_InstallPostPatch", rawInstallPostPatch) == YYTK_OK)
+                            pInstallPostPatch = reinterpret_cast<InstallPatch>(rawInstallPostPatch);
+
                         if (callback != NULL)
                         {
                             callback();
